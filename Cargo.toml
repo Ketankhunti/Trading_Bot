@@ -1,0 +1,52 @@
+[package]
+name = "trading_bot"
+version = "0.1.0"
+edition = "2024"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Asynchronous runtime for Rust. Essential for network operations.
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client for making REST API requests.
+reqwest = { version = "0.12", features = ["json", "native-tls"], default-features = false }
+
+# WebSocket client for real-time market data and API calls.
+# Changed to use "native-tls" for TLS support.
+tokio-tungstenite = { version = "0.27.0", features = ["connect", "native-tls"] }
+
+# Serialization/deserialization for JSON data.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# For handling dates and times, often used in API responses.
+chrono = { version = "0.4", features = ["serde"] }
+
+# For loading environment variables (API keys, secrets).
+dotenv = "0.15"
+
+# For generating HMAC SHA256 signatures, required by Binance API.
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22" # For WebSocket authentication if needed, or other encodings
+
+# For displaying data in tabular format in the terminal.
+prettytable-rs = "0.10"
+
+# Async trait for defining async methods in traits (useful for mocking/testing).
+async-trait = "0.1"
+
+# Log and env_logger for better logging
+log = "0.4"
+env_logger = "0.11"
+futures-util = "0.3.31"
+uuid = { version = "1.17.0", features = ["v4"] }
+ed25519-dalek = "2.1.1"
+pem = "3.0"
+
+# Dependencies for Ratatui TUI
+ratatui = "0.29.0" # The main TUI library
+crossterm = "0.29.0" # A terminal backend for ratatui
+
+# binance-sdk = { version = "6.0.0", features = ["spot","derivatives_trading_usds_futures"] }
