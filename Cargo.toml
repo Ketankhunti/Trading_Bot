@@ -48,5 +48,6 @@ pem = "3.0"
 # Dependencies for Ratatui TUI
 ratatui = "0.29.0" # The main TUI library
 crossterm = "0.29.0" # A terminal backend for ratatui
+url = "2.5.4"
 
 # binance-sdk = { version = "6.0.0", features = ["spot","derivatives_trading_usds_futures"] }

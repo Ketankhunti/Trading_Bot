@@ -1,8 +1,8 @@
 // src/websocket/mod.rs
 
 //! This module provides the core WebSocket client for interacting with the Binance API.
-//! It handles establishing and managing WebSocket connections for both
-//! real-time market data streams and signed user API requests.
+//! It handles establishing and managing WebSocket connections for signed user API requests.
+//! Public market data streams are handled by the `websocket_stream` module.
 
 use futures_util::{StreamExt, SinkExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
@@ -19,14 +19,19 @@ use hex::encode; // For hex encoding the signature
 use log::{info, error, debug, warn}; // For logging
 use uuid::Uuid; // For generating unique request IDs
 
-
+// Re-export stream-specific data structures from their new files
+pub mod agg_trade;
+pub mod kline;
+pub mod ticker;
+pub mod depth;
+pub mod user_data;
 
 // Re-export the structs for easier access from outside the websocket module
-use agg_trade::AggTradeStream;
-use kline::{KlineStream, KlineData};
-use ticker::TickerStream;
-use depth::{DepthStream, DepthLevel};
-use user_data::{UserDataStream, AccountUpdateEvent, AccountBalance, OrderUpdateEvent, BalanceUpdateEvent};
+pub use agg_trade::AggTradeStream;
+pub use kline::{KlineStream, KlineData};
+pub use ticker::TickerStream;
+pub use depth::{DepthStream, DepthLevel};
+pub use user_data::{UserDataStream, AccountUpdateEvent, AccountBalance, OrderUpdateEvent, BalanceUpdateEvent};
 
 
 /// Represents a generic WebSocket message received from Binance.
@@ -76,13 +81,11 @@ enum WsApiRequest {
 }
 
 /// Represents the WebSocket API Client.
-/// This client manages a persistent WebSocket connection for signed API requests
-/// and can also initiate connections for public market data streams.
+/// This client manages a persistent WebSocket connection for signed API requests.
 pub struct WebSocketClient {
     api_key: String,
     secret_key: String,
     ws_base_url_api: String, // Base URL for WebSocket API calls (signed requests like session.logon, account.status)
-    ws_base_url_market_stream: String, // Base URL for public market data streams (e.g., klines, trades)
     // Channel for sending requests to the WebSocket API handler task
     ws_api_request_sender: mpsc::Sender<WsApiRequest>,
     // Handle to the WebSocket API listener task (for signed requests)
@@ -96,7 +99,6 @@ impl WebSocketClient {
     /// * `api_key` - Your Binance API Key.
     /// * `secret_key` - Your Binance Secret Key.
     /// * `ws_base_url_api` - The base URL for the WebSocket API for signed requests (e.g., "wss://testnet.binancefuture.com/ws-fapi/v1").
-    /// * `ws_base_url_market_stream` - The base URL for public market data WebSocket streams (e.g., "wss://fstream.binancefuture.com/ws").
     ///
     /// # Returns
     /// A new `WebSocketClient` instance.
@@ -104,12 +106,11 @@ impl WebSocketClient {
         api_key: String,
         secret_key: String,
         ws_base_url_api: String,
-        ws_base_url_market_stream: String,
     ) -> Self {
         let (ws_api_request_sender, ws_api_request_receiver) = mpsc::channel::<WsApiRequest>(100); // Buffer for WS API requests
 
         // Clone necessary parts to move into the spawned WebSocket API listener task
-        let ws_api_base_url_clone = ws_api_base_url_api.clone();
+        let ws_api_base_url_clone = ws_base_url_api.clone();
         let api_key_clone = api_key.clone();
         let secret_key_clone = secret_key.clone();
 
@@ -127,7 +128,6 @@ impl WebSocketClient {
             api_key,
             secret_key,
             ws_base_url_api,
-            ws_base_url_market_stream,
             ws_api_request_sender,
             _ws_api_listener_handle: ws_api_listener_handle,
         }
@@ -371,56 +371,5 @@ impl WebSocketClient {
         info!("Attempting WebSocket session logon...");
         let params = serde_json::json!({}); // Params will be filled by request_websocket_api with apiKey, timestamp, signature
         self.request_websocket_api("session.logon", params).await
-    }
-
-    /// Connects to a public WebSocket stream for live market data (e.g., Klines).
-    /// This uses a separate WebSocket connection from the API calls.
-    ///
-    /// # Arguments
-    /// * `stream_path` - The path for the WebSocket stream (e.g., "btcusdt@kline_1m").
-    /// * `callback` - An asynchronous function that will be called with each received message.
-    ///
-    /// # Returns
-    /// A `Result` indicating success or a `String` error if the connection fails.
-    pub async fn connect_market_stream<F>(&self, stream_path: &str, mut callback: F) -> Result<(), String>
-    where
-        F: FnMut(Value) + Send + 'static,
-    {
-        let stream_url = format!("{}/{}", self.ws_base_url_market_stream, stream_path);
-        info!("Connecting to public WebSocket stream: {}", stream_url);
-
-        let (ws_stream, _) = connect_async(&stream_url)
-            .await
-            .map_err(|e| format!("Failed to connect to WebSocket: {}", e))?;
-
-        info!("Public WebSocket connection established for {}", stream_url);
-
-        let (_, mut read) = ws_stream.split();
-
-        while let Some(message) = read.next().await {
-            match message {
-                Ok(msg) => {
-                    if let Message::Text(text) = msg {
-                        match serde_json::from_str::<Value>(&text) {
-                            Ok(json_value) => {
-                                callback(json_value);
-                            },
-                            Err(e) => error!("Failed to parse WebSocket message as JSON: {} - {}", e, text),
-                        }
-                    } else if let Message::Ping(data) = msg {
-                        debug!("Received Ping: {:?}", data);
-                        // Tungstenite automatically sends Pong for Ping
-                    } else if let Message::Close(close_frame) = msg {
-                        info!("Public WebSocket connection closed: {:?}", close_frame);
-                        break;
-                    }
-                },
-                Err(e) => {
-                    error!("Public WebSocket error: {}", e);
-                    return Err(format!("Public WebSocket stream error: {}", e));
-                }
-            }
-        }
-        Ok(())
     }
 }

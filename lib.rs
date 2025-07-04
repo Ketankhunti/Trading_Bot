@@ -22,3 +22,4 @@ pub mod depth;
 pub mod user_data;
 
 pub mod websocket;
+pub mod websocket_stream;
