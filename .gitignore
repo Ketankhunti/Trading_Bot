@@ -1,3 +1,10 @@
 /target
 .env
-.csv
+*.csv
+*.xlsx
+*.xls
+data/
+logs/
+*.log
+.DS_Store
+Thumbs.db
