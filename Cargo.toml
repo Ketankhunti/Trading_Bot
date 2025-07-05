@@ -14,7 +14,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # Asynchronous runtime for Rust. Essential for network operations.
-tokio = { version = "1.46.1", features = ["full"] }
+tokio = { version = "1.46.1", features = ["full", "macros", "rt-multi-thread"] }
 
 # HTTP client for making REST API requests.
 reqwest = { version = "0.12", features = ["json", "native-tls"], default-features = false }
@@ -42,8 +42,6 @@ base64 = "0.22" # For WebSocket authentication if needed, or other encodings
 # For displaying data in tabular format in the terminal.
 prettytable-rs = "0.10"
 
-# Async trait for defining async methods in traits (useful for mocking/testing).
-async-trait = "0.1"
 
 # Log and env_logger for better logging
 log = "0.4"
@@ -59,5 +57,16 @@ crossterm = "0.29.0" # A terminal backend for ratatui
 url = "2.5.4"
 calamine = "0.28.0"
 csv = "1.3"
+
+async-trait = "0.1.59"
+
+axum = { version = "0.8.4", features = ["tokio"] }
+
+hyper = {version = "0.14", features = ["full"]}
+hyper-util = { version = "0.1", features = [
+  "full"
+] }
+ngrok = { version = "0.15.0", features = ["axum"] }
+
 
 # binance-sdk = { version = "6.0.0", features = ["spot","derivatives_trading_usds_futures"] }

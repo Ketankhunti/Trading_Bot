@@ -7,3 +7,4 @@ pub mod tui;
 pub mod websocket;
 pub mod websocket_stream;
 pub mod account_info;
+pub mod webhook;
