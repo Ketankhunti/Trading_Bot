@@ -7,19 +7,14 @@
 //! for account information, market data, and order management.
 
 // Re-export the core client module
-pub mod rest_client;
-
+pub mod rest_api;
+pub mod tui;
 // Re-export other modules as they are created
 pub mod account_info;
-pub mod market_data;
 pub mod order;
 
 // Re-export stream-specific data structures from their new files
-pub mod agg_trade;
-pub mod kline;
-pub mod ticker;
-pub mod depth;
-pub mod user_data;
-
 pub mod websocket;
 pub mod websocket_stream;
+
+pub mod streams;

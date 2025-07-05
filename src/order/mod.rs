@@ -5,7 +5,7 @@
 //! Active order management (placement, cancellation) would be handled by a separate WebSocket client.
 
 use serde::{Deserialize, Serialize};
-use crate::rest_client::RestClient; // Import the RestClient for queries
+use crate::rest_api::*; // Import the RestClient for queries
 use serde_json::{json, Value};  // Import Value for deserialization from generic JSON
 use std::io; // Import std::io for io::Error and io::ErrorKind (for custom error messages)
 use crate::websocket::WebSocketClient; // Import the WebSocketClient for order placement and cancellation
@@ -117,7 +117,6 @@ pub struct CancelOrderResponse {
     pub good_till_date: u64,
 }
 
-
 /// Represents an existing order's details when queried.
 /// Maps to the response from `/fapi/v1/order` (REST) or `/fapi/v1/allOrders`.
 #[derive(Debug, Deserialize)]
@@ -157,6 +156,45 @@ pub struct Order {
     pub orig_quote_order_qty: Option<String>, // Made optional
     pub activate_price: Option<String>, // New field from schema, optional
     pub price_rate: Option<String>, // New field from schema, optional
+}
+
+/// Represents the response received after modifying an order.
+/// Maps to the response from `order.modify` WebSocket API call.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModifyOrderResponse {
+    pub symbol: String,
+    pub order_id: u64,
+    pub order_list_id: Option<i64>,
+    pub client_order_id: String, // This is the NEW client order ID
+    pub orig_client_order_id: Option<String>, // This is the ORIGINAL client order ID (optional)
+    pub price: String,
+    pub orig_qty: String,
+    #[serde(rename = "executedQty")]
+    pub executed_qty: String,
+    #[serde(rename = "cumQty")]
+    pub cum_qty: String,
+    #[serde(rename = "cumQuote")]
+    pub cum_quote: String,
+    pub status: String,
+    pub time_in_force: String,
+    #[serde(rename = "type")]
+    pub order_type: String,
+    pub side: String,
+    pub stop_price: String,
+    pub reduce_only: bool,
+    pub position_side: String,
+    pub close_position: bool,
+    pub update_time: u64,
+    pub avg_price: String,
+    pub orig_type: String,
+    pub working_type: String,
+    pub price_protect: bool,
+    pub price_match: String,
+    pub self_trade_prevention_mode: String,
+    pub good_till_date: u64,
+    pub activate_price: Option<String>,
+    pub price_rate: Option<String>,
 }
 
 // Note: NewOrderResponse and CancelOrderResponse structs,
@@ -363,12 +401,67 @@ impl WebSocketClient { // Order placement and cancellation via WebSocket API
 
         let response_value: Value = self.request_websocket_api(method, params).await?;
 
-        print!("{}", response_value.to_string());
-
         serde_json::from_value(response_value)
             .map_err(|e| format!("Failed to parse cancel order response JSON: {}", e))
     }
 
-    // You can add other WebSocket-based order methods here, e.g., order.cancelAll
-    // For now, modify order would typically be a cancel-and-replace using new_order/cancel_order combination.
+    pub async fn modify_order(
+        &self,
+        symbol: &str,
+        side: OrderSide,
+        order_id: Option<u64>,
+        orig_client_order_id: Option<&str>,
+        quantity: Option<f64>,
+        price: Option<f64>,
+        stop_price: Option<f64>,
+        activation_price: Option<f64>,
+        callback_rate: Option<f64>,
+        new_client_order_id: Option<&str>,
+    ) -> Result<ModifyOrderResponse, String> {
+        let method = "order.modify";
+        let mut params = json!({
+            "symbol": symbol.to_uppercase(),
+            "side": serde_json::to_string(&side).unwrap().trim_matches('"'),
+        });
+
+        // Identify the order to amend
+        if let Some(id) = order_id {
+            params["orderId"] = json!(id);
+        } else if let Some(client_id) = orig_client_order_id {
+            params["origClientOrderId"] = json!(client_id);
+        } else {
+            return Err("Missing required order ID or original client order ID for modification.".to_string());
+        }
+
+        // Add optional modification parameters
+        if let Some(qty) = quantity {
+            params["quantity"] = json!(qty.to_string());
+        }
+        if let Some(p) = price {
+            params["price"] = json!(p.to_string());
+        }
+        if let Some(sp) = stop_price {
+            params["stopPrice"] = json!(sp.to_string());
+        }
+        if let Some(ap) = activation_price {
+            params["activationPrice"] = json!(ap.to_string());
+        }
+        if let Some(cr) = callback_rate {
+            params["callbackRate"] = json!(cr.to_string());
+        }
+        if let Some(new_id) = new_client_order_id {
+            params["newClientOrderId"] = json!(new_id);
+        }
+
+        // Ensure at least one modification parameter is provided
+        if quantity.is_none() && price.is_none() && stop_price.is_none() && activation_price.is_none() && callback_rate.is_none() {
+            return Err("At least one of quantity, price, stopPrice, activationPrice, or callbackRate must be provided for modification.".to_string());
+        }
+
+        let response_value: Value = self.request_websocket_api(method, params).await?;
+
+        serde_json::from_value(response_value)
+            .map_err(|e| format!("Failed to parse modify order response JSON: {}", e))
+    }
+
 }

@@ -1,98 +1,176 @@
-mod rest_client;
-mod account_info;
-mod tui_display;
-mod order;
-mod websocket;
+// src/main.rs
 
-use crate::rest_client::RestClient;
-use crate::account_info::{AccountInfo, AssetBalance, PositionInfo};
-use crate::order::*;
-use tui_display::*;
-use websocket::*;
-use dotenv::dotenv;
+//! Trading Bot - Binance Futures API Client
+//! 
+//! This is the main entry point for the trading bot application.
+//! Run tests using: cargo test -- --nocapture
+//! Or run specific tests: cargo test test_new_order -- --nocapture
+
+mod rest_api;
+mod websocket;
+mod tui;
+mod account_info;
+mod order;
+mod websocket_stream;
+
 use std::env;
+use tokio::sync::mpsc;
+use trading_bot::websocket_stream::{MarketStreamClient, BinanceWsMessage};
+use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv().ok();
-    let api_key = env::var("BINANCE_API_KEY").expect("BINANCE_API_KEY not set in .env");
-    let secret_key = env::var("BINANCE_SECRET_KEY").expect("BINANCE_SECRET_KEY not set in .env");
-    let rest_base_url = env::var("BINANCE_REST_BASE_URL").unwrap_or_else(|_| "https://testnet.binancefuture.com".to_string());
-
-    let client = RestClient::new(
-        api_key.clone(),
-        secret_key.clone(),
-        rest_base_url,
-    );
-
-    println!("--- Testing Binance Futures API Client ---");
-
-    match client.get_account_info().await {
-        Ok(account_info) => {
-            // Account info fetched successfully
-        },
-        Err(e) => eprintln!("Error fetching account info: {}", e),
-    }
-
-    println!("\nFetching Market Data (will display in TUI)...");
-
-    println!("\nFetching Historical Orders (will display in TUI)...");
-
-    match client.get_all_orders("BTCUSDT", None, Some(10)).await {
-        Ok(orders) => {
-            // Historical orders fetched successfully
-        },
-        Err(e) => eprintln!("Error getting all orders: {}", e),
-    }
-
-    println!("\nFetching Open Orders (will display in TUI)...");
-    match client.get_open_orders(None).await {
-        Ok(orders) => {
-            display_struct_in_tui(&orders, "All Open Orders").await?;
-        },
-        Err(e) => eprintln!("Error getting open orders: {}", e),
-    }
-
-    let example_order_id = 5191956932;
-    match client.query_order("BTCUSDT", Some(example_order_id), None).await {
-        Ok(order) => {
-            display_struct_in_tui(&order, &format!("Order ID: {}", example_order_id)).await?;
-        },
-        Err(e) => eprintln!("Error querying order {}: {}", example_order_id, e),
-    }
-
-    let ws_client = WebSocketClient::new(
-        api_key,
-        secret_key,
-        "wss://testnet.binancefuture.com/ws-fapi/v1".to_string()
-    ).await;
-
-    match ws_client.new_order(
-        "BNBUSDT",
-        OrderSide::Buy,
-        OrderType::Limit,
-        0.02,
-        Some(300.0),
-        Some(TimeInForce::Gtc),
-        Some("my_ws_test_order_123"),
-    ).await {
-        Ok(response) => {
-            display_struct_in_tui(&response, "New WebSocket Order Placed").await?;
-        },
-        Err(e) => eprintln!("Error placing new WebSocket order (check testnet balance/rules): {}", e),
-    }
-
-    let order_id_to_cancel = 541097441;
-    match ws_client.cancel_order(
-        "BNBUSDT",
-        Some(order_id_to_cancel),
-        Some("my_ws_test_order_123"),
-    ).await {
-        Ok(cancel_response) => {
-            display_struct_in_tui(&cancel_response, &format!("Canceled Order ID: {}", order_id_to_cancel)).await?;
-        },
-        Err(e) => eprintln!("Error canceling WebSocket order {}: {}", order_id_to_cancel, e),
-    }
-
+    println!("=== Trading Bot - Binance Futures API Client ===");
+    println!();
+    println!("This application provides a client for interacting with Binance Futures API.");
+    println!("All testing functionality has been moved to integration tests.");
+    println!();
+    println!("To run tests:");
+    println!("  cargo test -- --nocapture                    # Run all tests");
+    println!("  cargo test test_new_order -- --nocapture     # Test placing new orders");
+    println!("  cargo test test_modify_order -- --nocapture  # Test modifying orders");
+    println!("  cargo test test_cancel_order -- --nocapture  # Test canceling orders");
+    println!("  cargo test test_account_info -- --nocapture  # Test account info");
+    println!("  cargo test test_websocket_stream_lifecycle -- --nocapture  # Test WebSocket stream");
+    println!();
+    println!("Available test functions:");
+    println!("  - test_account_info()      # Fetch and display account information");
+    println!("  - test_historical_orders() # Fetch and display historical orders");
+    println!("  - test_open_orders()       # Fetch and display open orders");
+    println!("  - test_new_order()         # Place a new order");
+    println!("  - test_modify_order()      # Place and modify an order");
+    println!("  - test_cancel_order()      # Place and cancel an order");
+    println!();
+    println!("For production use, implement your trading strategy here.");
+    println!("The modules are ready to use:");
+    println!("  - rest_api::RestClient     # For REST API calls");
+    println!("  - websocket::WebSocketClient # For WebSocket API calls");
+    println!("  - order::*                 # For order types and operations");
+    println!("  - account_info::*          # For account information");
+    println!("  - tui::display_struct_in_tui # For displaying data in TUI");
+    println!();
+    
+    // Demo WebSocket Stream functionality
+    println!("=== WebSocket Stream Demo ===");
+    demo_websocket_stream().await?;
+    
     Ok(())
 }
+
+/// Demo function to showcase WebSocket stream functionality
+async fn demo_websocket_stream() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🚀 Starting WebSocket Stream Demo...");
+    
+    // Create channel for receiving stream data
+    let (data_sender, mut data_receiver) = mpsc::channel::<BinanceWsMessage>(100);
+
+    // Create WebSocket stream client
+    let ws_url = "wss://fstream.binancefuture.com/ws".to_string();
+    println!("📡 Connecting to: {}", ws_url);
+    
+    let client = MarketStreamClient::new(ws_url, data_sender).await;
+    println!("✅ MarketStreamClient created successfully");
+
+    // Wait for connection to establish
+    println!("⏳ Waiting 3 seconds for connection to establish...");
+    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+    // Subscribe to multiple streams
+    let streams = vec![
+        "btcusdt@kline_1m".to_string(),
+        "btcusdt@aggTrade".to_string(),
+        "btcusdt@ticker".to_string()
+    ];
+    println!("📊 Subscribing to streams: {:?}", streams);
+    
+    match client.subscribe(streams.clone()).await {
+        Ok(response) => {
+            println!("✅ Successfully subscribed to streams!");
+            println!("   Response: {}", serde_json::to_string_pretty(&response)?);
+        }
+        Err(e) => {
+            println!("❌ Failed to subscribe to streams: {}", e);
+            return Err(e.into());
+        }
+    }
+
+    println!();
+    println!("📈 Listening for market data... (Press Ctrl+C to stop)");
+    println!("{}", "=".repeat(80));
+    
+    let mut message_count = 0;
+    let start_time = std::time::Instant::now();
+    
+    // Listen for messages for 30 seconds
+    let message_stream = tokio::time::timeout(
+        tokio::time::Duration::from_secs(30), 
+        async {
+            loop {
+                match data_receiver.recv().await {
+                    Some(message) => {
+                        message_count += 1;
+                        match message {
+                            BinanceWsMessage::StreamData { stream, data } => {
+                                println!("📊 [{}] Stream: {}", 
+                                    chrono::Utc::now().format("%H:%M:%S"), stream);
+                                println!("   Data: {}", serde_json::to_string_pretty(&data)?);
+                                println!("   {}", "-".repeat(60));
+                            }
+                            BinanceWsMessage::Result(result) => {
+                                println!("✅ [{}] Result: {:?}", 
+                                    chrono::Utc::now().format("%H:%M:%S"), result);
+                            }
+                            BinanceWsMessage::Error(err) => {
+                                println!("❌ [{}] Error: {:?}", 
+                                    chrono::Utc::now().format("%H:%M:%S"), err);
+                            }
+                            BinanceWsMessage::Raw(raw) => {
+                                println!("📄 [{}] Raw: {}", 
+                                    chrono::Utc::now().format("%H:%M:%S"), 
+                                    serde_json::to_string_pretty(&raw)?);
+                            }
+                        }
+                    }
+                    None => {
+                        println!("🔌 Stream channel closed");
+                        break;
+                    }
+                }
+            }
+            Ok::<(), Box<dyn std::error::Error>>(())
+        }
+    ).await;
+
+    match message_stream {
+        Ok(_) => println!("⏰ Demo timeout reached"),
+        Err(_) => println!("⏰ Demo timeout reached"),
+    }
+
+    println!();
+    println!("📊 Demo Summary:");
+    println!("   Total messages received: {}", message_count);
+    println!("   Duration: {:.2} seconds", start_time.elapsed().as_secs_f64());
+    println!("   Messages per second: {:.2}", 
+        message_count as f64 / start_time.elapsed().as_secs_f64());
+
+    // Unsubscribe from the streams
+    println!("🔌 Unsubscribing from streams...");
+    match client.unsubscribe(streams).await {
+        Ok(response) => {
+            println!("✅ Successfully unsubscribed!");
+            println!("   Response: {}", serde_json::to_string_pretty(&response)?);
+        }
+        Err(e) => {
+            println!("❌ Failed to unsubscribe: {}", e);
+        }
+    }
+
+    println!("🎉 WebSocket Stream Demo completed!");
+    println!();
+    
+    Ok(())
+}
+
+
+//541283361
+// 541278270

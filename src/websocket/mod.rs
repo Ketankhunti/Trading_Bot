@@ -19,21 +19,6 @@ use hex::encode; // For hex encoding the signature
 use log::{info, error, debug, warn}; // For logging
 use uuid::Uuid; // For generating unique request IDs
 
-// Re-export stream-specific data structures from their new files
-pub mod agg_trade;
-pub mod kline;
-pub mod ticker;
-pub mod depth;
-pub mod user_data;
-
-// Re-export the structs for easier access from outside the websocket module
-pub use agg_trade::AggTradeStream;
-pub use kline::{KlineStream, KlineData};
-pub use ticker::TickerStream;
-pub use depth::{DepthStream, DepthLevel};
-pub use user_data::{UserDataStream, AccountUpdateEvent, AccountBalance, OrderUpdateEvent, BalanceUpdateEvent};
-
-
 /// Represents a generic WebSocket message received from Binance.
 /// This enum uses `untagged` to allow flexible deserialization based on message structure.
 #[derive(Debug, Deserialize, Serialize, Clone)]

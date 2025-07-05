@@ -4,7 +4,7 @@
 //! from the Binance Futures API.
 
 use serde::{Deserialize, Serialize};
-use crate::rest_client::RestClient; // Import the core BinanceClient
+use crate::rest_api::*; // Import the core BinanceClient
 use serde_json::Value; // Import Value for deserialization from generic JSON
 
 /// Represents the overall account information for Binance Futures.
