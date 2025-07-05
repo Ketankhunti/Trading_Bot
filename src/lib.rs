@@ -1,20 +1,9 @@
-// src/lib.rs
-
-//! A modular Rust client for interacting with the Binance API.
-//!
-//! This library aims to provide a clean and organized way to access
-//! Binance's various API endpoints, separated into logical modules
-//! for account information, market data, and order management.
-
-// Re-export the core client module
 pub mod rest_api;
-pub mod tui;
-// Re-export other modules as they are created
-pub mod account_info;
 pub mod order;
-
-// Re-export stream-specific data structures from their new files
+pub mod strategy;
+pub mod market_data;
+pub mod streams;
+pub mod tui;
 pub mod websocket;
 pub mod websocket_stream;
-
-pub mod streams;
+pub mod account_info;

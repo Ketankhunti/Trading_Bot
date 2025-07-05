@@ -11,7 +11,7 @@ use std::io; // Import std::io for io::Error and io::ErrorKind (for custom error
 use crate::websocket::WebSocketClient; // Import the WebSocketClient for order placement and cancellation
 
 /// Enum representing the type of order.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OrderType {
     Limit,
@@ -24,7 +24,7 @@ pub enum OrderType {
 }
 
 /// Enum representing the side of the order (BUY or SELL).
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OrderSide {
     Buy,
@@ -32,7 +32,7 @@ pub enum OrderSide {
 }
 
 /// Enum representing the time in force for an order.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TimeInForce {
     Gtc, // Good Till Cancel
