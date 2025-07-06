@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use std::error::Error;
 use std::fs::File;
-use std::io::Read;
 use std::cmp::max;
 
 // --- Configuration ---

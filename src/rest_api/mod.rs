@@ -5,13 +5,13 @@
 //! functionalities for signed and unsigned GET and POST requests,
 //! managing connections, authentication (signing), and basic request/response dispatch.
 
-use reqwest::{Client, Response, Error, Url};
+use reqwest::{Client, Url};
 use serde_json::Value;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use hex::encode;
 use std::time::{SystemTime, UNIX_EPOCH};
-use log::{info, error, debug}; // For logging
+use log::debug; // For logging
 
 /// Represents the Binance REST API Client.
 /// This client handles REST API calls.

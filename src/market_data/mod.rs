@@ -15,7 +15,9 @@ use serde_json::Value; // Import Value for deserialization from generic JSON
 pub struct TickerPrice {
     pub symbol: String,
     pub price: String, // Use String for decimal numbers
+    pub time: u64, // Added 'time' field as per the /fapi/v1/ticker/price response example
 }
+
 
 /// Represents a 24-hour ticker statistics for a symbol.
 /// Maps to the response from `/fapi/v1/ticker/24hr`.
@@ -135,11 +137,12 @@ impl RestClient {
     /// A `Result` containing `TickerPrice` on success, or a `String` error
     /// if the request fails or JSON deserialization fails.
     pub async fn get_current_price(&self, symbol: &str) -> Result<TickerPrice, String> {
-        let endpoint = "/fapi/v1/avgPrice";
+        let endpoint = "/fapi/v1/ticker/price"; // Changed endpoint to /fapi/v1/ticker/price
         let symbol_uppercase = symbol.to_uppercase();
         let params = vec![("symbol", symbol_uppercase.as_str())];
         let response_value: Value = self.get_unsigned_rest_request(endpoint, params).await?;
 
+        // The response for /fapi/v1/ticker/price is a single object if symbol is provided
         serde_json::from_value(response_value)
             .map_err(|e| format!("Failed to parse current price JSON: {}", e))
     }

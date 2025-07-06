@@ -1,5 +1,5 @@
-
 use trading_bot::websocket::WebSocketClient;
+use trading_bot::rest_api::RestClient; // Add REST client import
 use trading_bot::webhook; // Import the webhook listener module
 use log::{info, error, warn};
 use std::env;
@@ -22,6 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let api_key = env::var("BINANCE_API_KEY").expect("BINANCE_API_KEY not set in .env");
     let secret_key = env::var("BINANCE_SECRET_KEY").expect("BINANCE_SECRET_KEY not set in .env");
     let ws_api_base_url = env::var("BINANCE_WS_API_BASE_URL").expect("BINANCE_WS_API_BASE_URL not set in .env");
+    let rest_api_base_url = env::var("BINANCE_REST_API_BASE_URL").expect("BINANCE_REST_API_BASE_URL not set in .env");
     let webhook_local_listen_addr = env::var("WEBHOOK_LOCAL_LISTEN_ADDR").expect("WEBHOOK_LOCAL_LISTEN_ADDR not set in .env");
 
     // --- Initialize WebSocketClient (needed for webhook order dispatch) ---
@@ -30,6 +31,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         secret_key.clone(), // Clone for ws_client
         ws_api_base_url.clone(),
     ).await;
+
+    // --- Initialize RestClient (needed for fetching current prices) ---
+    let rest_client = RestClient::new(
+        api_key.clone(), // Clone for rest_client
+        secret_key.clone(), // Clone for rest_client
+        rest_api_base_url,
+    );
 
     // Perform WebSocket session logon (important for authenticated WS API calls)
     info!("Attempting WebSocket Session Logon...");
@@ -69,7 +77,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let webhook_handle = tokio::spawn(async move {
         if let Err(e) = webhook::run_webhook_listener(
             ws_client,
-            &webhook_local_listen_addr // Axum binds to this local addres
+            rest_client, // Pass the REST client to the webhook listener
+            &webhook_local_listen_addr // Axum binds to this local address
         ).await {
             error!("Webhook listener failed: {}", e);
         }

@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use crate::rest_api::*; // Import the RestClient for queries
 use serde_json::{json, Value};  // Import Value for deserialization from generic JSON
-use std::io; // Import std::io for io::Error and io::ErrorKind (for custom error messages)
+ // Import std::io for io::Error and io::ErrorKind (for custom error messages)
 use crate::websocket::WebSocketClient; // Import the WebSocketClient for order placement and cancellation
 
 /// Enum representing the type of order.

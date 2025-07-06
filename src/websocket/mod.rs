@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
-use url::Url;
 use std::collections::{HashMap, BTreeMap}; // For managing pending requests and sorted params
 use std::time::{SystemTime, UNIX_EPOCH}; // For timestamps in signed requests
 use hmac::{Hmac, Mac}; // For HMAC signing
