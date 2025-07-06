@@ -1,18 +1,3 @@
-// src/main.rs
-
-//! This file sets up the main application for the trading bot.
-//! It runs a TradingView webhook listener exposed via an ngrok tunnel.
-//!
-//! To run this example:
-//! 1. Ensure you have updated your `Cargo.toml` with all necessary dependencies, including `ngrok`.
-//! 2. Create a `.env` file in your project root, based on `.env.example`, and fill in:
-//!    - BINANCE_API_KEY
-//!    - BINANCE_SECRET_KEY
-//!    - BINANCE_WS_API_BASE_URL
-//!    - TRADINGVIEW_WEBHOOK_SECRET (a secret string you define)
-//!    - NGROK_AUTHTOKEN (your ngrok authentication token)
-//!    - WEBHOOK_LOCAL_LISTEN_ADDR (e.g., "127.0.0.1:3000" - this is what ngrok forwards to)
-//! 3. Run `cargo run`.
 
 use trading_bot::websocket::WebSocketClient;
 use trading_bot::webhook; // Import the webhook listener module
