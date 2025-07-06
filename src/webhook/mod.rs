@@ -61,7 +61,7 @@ async fn handle_webhook(
 
     // Determine quantity to trade. Using a fixed default quantity for now.
     // IMPORTANT: Adjust this default quantity based on your strategy and minimum notional values.
-    let quantity_to_trade = 0.08; // Increased quantity to meet minimum notional value
+    let quantity_to_trade = 0.04; // Reduced quantity to fit within available balance (~4,740 USDT)
 
     // Ensure minimum notional value (e.g., 5 USDT for Binance Futures)
     let min_notional = 5.0; // This should ideally be fetched from exchange info

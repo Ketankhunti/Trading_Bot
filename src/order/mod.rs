@@ -342,6 +342,55 @@ impl WebSocketClient { // Order placement and cancellation via WebSocket API
         time_in_force: Option<TimeInForce>,
         new_client_order_id: Option<&str>,
     ) -> Result<NewOrderResponse, String> {
+
+        // --- 1. Balance Check ---
+        let quote_asset = if symbol.ends_with("USDT") {
+            "USDT"
+        } else if symbol.ends_with("BUSD") {
+            "BUSD"
+        } else {
+            // Add other quote assets as needed or handle unknown
+            return Err(format!("Unsupported quote asset for symbol: {}", symbol));
+        };
+
+        // Call the new helper function in account_info to get available balance
+        let available_balance_quote = match self.get_asset_balance(quote_asset).await? {
+            Some(asset_balance) => asset_balance.available_balance.parse::<f64>()
+                .map_err(|e| format!("Failed to parse available balance: {}", e))?,
+            None => return Err(format!("Asset {} not found in account balance", quote_asset)),
+        };
+
+        let order_price = if let Some(price)  = price {
+            price
+        }else{
+            // For market orders, we need to fetch the current price
+            match self.get_current_price(symbol).await {
+                Ok(ticker_price) => ticker_price.price.parse::<f64>()
+                    .map_err(|e| format!("Failed to parse current price: {}", e))?,
+                Err(e) => return Err(format!("Failed to get current price for {}: {}", symbol, e)),
+            }
+        };
+
+
+        let estimated_cost = quantity * order_price;
+        // Assuming a fixed commission rate for simplicity. In a real bot, fetch from exchange info.
+        const COMMISSION_RATE: f64 = 0.0004; // 0.04%
+        let total_cost_with_commission = estimated_cost * (1.0 + COMMISSION_RATE);
+
+        // Debug prints for balance check
+        println!("[DEBUG] Symbol: {} | Side: {:?} | Order Type: {:?}", symbol, side, order_type);
+        println!("[DEBUG] Available balance for {}: {:.8}", quote_asset, available_balance_quote);
+        println!("[DEBUG] Order quantity: {:.8} | Order price: {:.8}", quantity, order_price);
+        println!("[DEBUG] Estimated cost: {:.8} | Total with commission: {:.8}", estimated_cost, total_cost_with_commission);
+
+        if available_balance_quote < total_cost_with_commission {
+            println!("[DEBUG] Insufficient funds: required {:.8}, available {:.8}", total_cost_with_commission, available_balance_quote);
+            return Err(format!(
+                "Insufficient funds for order. Required: {:.4} {} (including commission). Available: {:.4} {}",
+                total_cost_with_commission, quote_asset, available_balance_quote, quote_asset
+            ));
+        }
+
         let method = "order.place";
         let mut params = json!({
             "symbol": symbol.to_uppercase(),
@@ -418,6 +467,43 @@ impl WebSocketClient { // Order placement and cancellation via WebSocket API
         callback_rate: Option<f64>,
         new_client_order_id: Option<&str>,
     ) -> Result<ModifyOrderResponse, String> {
+        // Balance check for buy orders (only if price and quantity are being modified)
+        if side == OrderSide::Buy && (price.is_some() || quantity.is_some()) {
+            let quote_asset = if symbol.ends_with("USDT") {
+                "USDT"
+            } else if symbol.ends_with("BUSD") {
+                "BUSD"
+            } else {
+                // Add other quote assets as needed or handle unknown
+                return Err(format!("Unsupported quote asset for symbol: {}", symbol));
+            };
+
+            // Get available balance for the quote asset
+            let available_balance_quote = match self.get_asset_balance(quote_asset).await? {
+                Some(asset_balance) => asset_balance.available_balance.parse::<f64>()
+                    .map_err(|e| format!("Failed to parse available balance: {}", e))?,
+                None => return Err(format!("Asset {} not found in account balance", quote_asset)),
+            };
+
+            // Calculate estimated cost based on modified parameters
+            let order_price = price.unwrap_or(0.0); // Use modified price if available
+            let order_quantity = quantity.unwrap_or(0.0); // Use modified quantity if available
+            
+            if order_price > 0.0 && order_quantity > 0.0 {
+                let estimated_cost = order_quantity * order_price;
+                // Assuming a fixed commission rate for simplicity. In a real bot, fetch from exchange info.
+                const COMMISSION_RATE: f64 = 0.0004; // 0.04%
+                let total_cost_with_commission = estimated_cost * (1.0 + COMMISSION_RATE);
+
+                if available_balance_quote < total_cost_with_commission {
+                    return Err(format!(
+                        "Insufficient funds for order modification. Required: {:.4} {} (including commission). Available: {:.4} {}",
+                        total_cost_with_commission, quote_asset, available_balance_quote, quote_asset
+                    ));
+                }
+            }
+        }
+
         let method = "order.modify";
         let mut params = json!({
             "symbol": symbol.to_uppercase(),

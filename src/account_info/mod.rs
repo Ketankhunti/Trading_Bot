@@ -4,8 +4,8 @@
 //! from the Binance Futures API.
 
 use serde::{Deserialize, Serialize};
-use crate::rest_api::*; // Import the core BinanceClient
-use serde_json::Value; // Import Value for deserialization from generic JSON
+use crate::{rest_api::*, websocket::WebSocketClient}; // Import the core BinanceClient
+use serde_json::{json, Value}; // Import Value for deserialization from generic JSON
 
 /// Represents the overall account information for Binance Futures.
 /// This struct maps to the response from the `/fapi/v3/account` endpoint.
@@ -111,4 +111,26 @@ impl RestClient {
     // You can add more account-related functions here, such as:
     // - get_position_information()
     // - get_commission_rate(symbol: &str)
+}
+
+
+impl WebSocketClient { // Account info via WebSocket API
+    pub async fn get_account_info(&self) -> Result<AccountInfo, String> {
+
+        let method = "v2/account.status";
+        let params = json!({}); // No specific params needed for this call
+
+        let response_value: Value = self.request_websocket_api(method, params).await?;
+
+        // The WebSocket client already extracts the "result" field, so we can parse directly
+        serde_json::from_value(response_value)
+            .map_err(|e| format!("Failed to parse account info JSON from WS response: {}", e))
+    }
+
+
+    pub async fn get_asset_balance(&self, asset: &str) -> Result<Option<AssetBalance>, String> {
+        let account_info = self.get_account_info().await?;
+        let balance = account_info.assets.into_iter().find(|b| b.asset == asset.to_uppercase());
+        Ok(balance)
+    }
 }

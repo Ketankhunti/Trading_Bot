@@ -5,8 +5,8 @@
 //! 24-hour ticker statistics, and historical candlestick data.
 
 use serde::Deserialize;
-use crate::rest_api::RestClient; // Import the core RestClient
-use serde_json::Value; // Import Value for deserialization from generic JSON
+use crate::{rest_api::RestClient, websocket::WebSocketClient}; // Import the core RestClient
+use serde_json::{json, Value}; // Import Value for deserialization from generic JSON
 
 /// Represents a single ticker price for a symbol.
 /// Maps to the response from `/fapi/v1/ticker/price`.
@@ -222,4 +222,20 @@ impl RestClient {
     // - get_recent_trades(symbol: &str, limit: Option<u16>)
     // - get_historical_trades(symbol: &str, limit: Option<u16>, from_id: Option<u64>)
     // - get_exchange_info()
+}
+
+impl WebSocketClient{
+
+pub async fn get_current_price(&self, symbol: &str) -> Result<TickerPrice, String> {
+    let method = "ticker.price";
+    let params = json!({
+        "symbol": symbol.to_uppercase(),
+    });
+
+    let response_value: Value = self.request_websocket_api(method, params).await?;
+
+    serde_json::from_value(response_value)
+        .map_err(|e| format!("Failed to parse ticker price JSON from WS response: {}", e))
+}
+
 }
